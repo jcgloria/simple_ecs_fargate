@@ -44,33 +44,73 @@ resource "aws_iam_role" "task_execution_role" {
   )
 }
 
-# ECS Task Execution Policy (Add extra permissions to the task execution role if needed)
-resource "aws_iam_policy" "task_execution_policy"{
-    name = "my_ecs_task_execution_policy"
-    policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-            {
-                Action = [
-                    "ecr:GetAuthorizationToken",
-                    "ecr:BatchCheckLayerAvailability",
-                    "ecr:GetDownloadUrlForLayer",
-                    "ecr:BatchGetImage",
-                    "logs:CreateLogStream",
-                    "logs:CreateLogGroup",
-                    "logs:PutLogEvents"
-                ]
-                Effect = "Allow"
-                Resource = "*"
-            },
+# ECS Task Execution Policy 
+resource "aws_iam_policy" "task_execution_policy" {
+  name = "my_ecs_task_execution_policy"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "logs:CreateLogStream",
+          "logs:CreateLogGroup",
+          "logs:PutLogEvents"
         ]
-    })
+        Effect   = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
 }
 
-# Attach the policy to the role
+# Attach the policy to the task execution role
 resource "aws_iam_role_policy_attachment" "task_execution_policy_attachment" {
-    role = aws_iam_role.task_execution_role.name
-    policy_arn = aws_iam_policy.task_execution_policy.arn
+  role       = aws_iam_role.task_execution_role.name
+  policy_arn = aws_iam_policy.task_execution_policy.arn
+}
+
+# ECS Task Role 
+resource "aws_iam_role" "task_role" {
+  name = "my_task_role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      },
+    ] }
+  )
+}
+
+# ECS Task Policy
+resource "aws_iam_policy" "task_role_policy" {
+  name = "my_ecs_task_role_policy"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "s3:*" # Full access to S3, adjust permissions as needed
+        ]
+        Effect   = "Allow"
+        Resource = "*" # You can limit the resources if needed
+      }
+    ]
+  })
+}
+
+# Attach the policy to the task role
+resource "aws_iam_role_policy_attachment" "task_role_policy_attachment" {
+  role       = aws_iam_role.task_role.name
+  policy_arn = aws_iam_policy.task_role_policy.arn
 }
 
 # ECS Fargate Task Definition + Container Definition
@@ -78,6 +118,7 @@ resource "aws_ecs_task_definition" "task" {
   family                   = var.task_name
   requires_compatibilities = ["FARGATE"]
   execution_role_arn       = aws_iam_role.task_execution_role.arn
+  task_role_arn            = aws_iam_role.task_role.arn
   network_mode             = "awsvpc"
   cpu                      = 1024
   memory                   = 2048
@@ -120,10 +161,3 @@ output "cluster_name" {
 output "task_name" {
   value = aws_ecs_task_definition.task.family
 }
-
-
-
-
-
-
-
