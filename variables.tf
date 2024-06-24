@@ -1,7 +1,7 @@
 variable "region" {
   description = "Region to deploy"
   type        = string
-  default     = "eu-west-2"
+  default     = "us-east-1"
 }
 
 variable "cluster_name" {
